@@ -1,11 +1,2282 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus</title>
-    </head>
-    <body>
-        PakePlus
-    </body>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像批量检测工具</title>
+    <!-- 引入调试监控模块 -->
+    <script src="debug_monitor.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: stretch;
+            min-width: 0;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        /* 左侧控制面板 */
+        .control-panel {
+            width: 250px;
+            min-width: 200px;
+            max-width: 400px;
+            background-color: #fff;
+            padding: 15px;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-section {
+            margin-bottom: 20px;
+        }
+
+        .panel-section h3 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        /* 检测记录区域样式 */
+        .panel-section h4 {
+            margin: 8px 0 5px 0;
+            color: #555;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 5px;
+            transform: scale(0.9);
+        }
+
+        .error-type-section,
+        .record-info-section,
+        .remark-section {
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+
+        /* 树状图导航 */
+        .tree-navigation {
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* 图像列表区域 */
+        .image-list-section {
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+        }
+
+        /* 树状图内容容器 */
+        .tree-content-container {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 200px;
+        }
+
+        /* 树状图内容包装器 */
+        .tree-content-wrapper {
+            padding: 10px;
+        }
+
+        .tree-header {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            background-color: #f8f9fa;
+        }
+
+
+
+        .tree-content-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-height: 0; /* 修复弹性容器高度问题 */
+            align-items: stretch;
+            flex-grow: 1;
+            overflow: visible;
+        }
+
+        .tree-content-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 100%; /* 确保最大高度不超过父容器 */
+            padding: 10px;
+            min-height: 100%; /* 确保正确继承高度 */
+        }
+
+        .tree-content {
+            min-width: auto;
+            flex: 1;
+            min-height: min-content;
+        }
+
+        .tree-content-horizontal .tree-node {
+            writing-mode: horizontal-tb;
+            text-orientation: mixed;
+        }
+
+        .tree-node {
+            margin: 2px 0;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+        }
+
+        .tree-node:hover {
+            background-color: #f8f9fa;
+        }
+
+        .tree-node.level-1 {
+            padding-left: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .tree-node.level-2 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #34495e;
+        }
+
+        .tree-node.level-3 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #7f8c8d;
+        }
+
+        .tree-node.level-4 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #95a5a6;
+        }
+
+        .tree-node.level-5 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #bdc3c7;
+        }
+
+        .tree-node.level-6 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #d5dbdb;
+        }
+
+        .tree-node.level-7 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #e6e6e6;
+        }
+
+        .tree-node.level-8 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #f2f2f2;
+        }
+
+        .tree-node.level-9 {
+            padding-left: 5px;
+            font-weight: normal;
+            color: #f8f9fa;
+        }
+
+        .tree-node.matched {
+            background-color: #d4edda;
+            border-left: 3px solid #28a745;
+        }
+
+        .tree-node.current {
+            background-color: #007bff;
+            color: white !important;
+        }
+
+        .tree-node.matched.current {
+            background-color: #28a745;
+            color: white !important;
+        }
+
+        .expand-icon {
+            display: inline-block;
+            width: 12px;
+            text-align: center;
+            margin-right: 5px;
+            transition: transform 0.2s;
+        }
+
+        .expand-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        /* 图像列表 */
+        .image-navigation {
+            width: 200px;
+            background-color: #fff;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .image-header {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            background-color: #f8f9fa;
+        }
+
+
+
+        .image-list-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow-y: auto;
+            min-height: 200px;
+            align-items: stretch;
+        }
+
+        .image-list-wrapper {
+            flex: 1;
+            overflow: auto;
+        }
+
+        .image-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            min-width: max-content;
+        }
+
+        .image-item {
+            padding: 6px 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 11px;
+        }
+
+        .image-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .image-item.matched {
+            background-color: #fff3cd;
+            border-left: 3px solid #ffc107;
+            color: #856404;
+        }
+
+        .image-item.current {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .image-item.matched.current {
+            background-color: #ffc107;
+            color: #856404;
+            border-left: 3px solid #ffc107;
+        }
+
+        /* 主显示区域 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+            position: relative;
+        }
+
+        .image-info {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            background-color: #f8f9fa;
+            font-size: 13px;
+        }
+
+        .image-display {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-color: #333;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            align-items: stretch;
+            cursor: grab;
+        }
+
+        .image-display.dragging {
+            cursor: grabbing;
+        }
+
+        .image-container {
+            position: absolute;
+            top: 0;
+            left: -50;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center center;
+        }
+
+        .image-container img {
+            max-width: none;
+            max-height: none;
+            object-fit: contain;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .loading-indicator {
+            position: absolute;
+            top: 50%;
+            left: -50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 26px;
+            z-index: 100;
+        }
+
+        .excel-overlay {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            width: 380px;
+            max-height: 400px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            font-size: 12px;
+            color: white;
+        }
+
+        .excel-overlay.hidden {
+            display: none;
+        }
+
+        .excel-overlay h4 {
+            margin: 0 0 10px 0;
+            color: white;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            padding-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .excel-overlay div {
+            margin-bottom: 4px;
+        }
+
+        .excel-overlay strong {
+            color: #4dabf7;
+        }
+
+        .excel-item {
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        .excel-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .toggle-overlay-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            z-index: 1001;
+            font-size: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+
+        .controls-overlay {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .control-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.3);
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: white;
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .nav-btn {
+            padding: 6px 12px;
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-size: 11px;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-btn:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-bar {
+            padding: 8px;
+            background-color: #e9ecef;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .match-count {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .file-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .reset-view-btn {
+            background-color: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 16px;
+            padding: 4px 10px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-size: 10px;
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+
+        .reset-view-btn:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            margin: 10px 0;
+        }
+
+        .node-author {
+             font-size: 10px;
+             color: #666;
+             white-space: nowrap;
+             overflow: hidden;
+             text-overflow: ellipsis;
+         }
+
+         /* 调整手柄样式 */
+         .resize-handle {
+             width: 8px;
+             background-color: #ddd;
+             cursor: col-resize;
+             position: relative;
+             transition: background-color 0.2s, width 0.2s;
+             z-index: 10;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+         }
+
+         .resize-handle:hover {
+             background-color: #007bff;
+             width: 12px;
+         }
+
+         .resize-handle::after {
+             content: "⋮";
+             color: #666;
+             font-size: 12px;
+             font-weight: bold;
+         }
+
+         .resize-handle:hover::after {
+             color: white;
+         }
+     </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 调整手柄0: 控制面板左侧边界 -->
+        <div class="resize-handle" id="handle0" onmousedown="startResize(event, 'controlPanel', null)" style="margin-right: 0;"></div>
+        
+        <!-- 左侧控制面板 -->
+        <div class="control-panel">
+            <div class="panel-section">
+                <h3>图像导入</h3>
+                <input type="file" id="imageInput" accept="image/*" multiple webkitdirectory directory style="display: none;">
+                <button id="imageImportBtn" class="btn" onclick="imageInput.click();">导入图像</button>
+                <span class="stats-info" id="imageStats">0 张图像</span>
+            </div>
+            <div class="panel-section">
+                <h3>Excel导入</h3>
+                <input type="file" id="excelInput" accept=".xlsx, .xls" style="display: none;">
+                <button class="btn" onclick="document.getElementById('excelInput').click();">导入表4</button>
+                <div class="file-info" id="excelInfo">未导入Excel文件</div>
+            </div>
+
+            <div class="panel-section">
+                <h3>统计信息</h3>
+                <div class="file-info" id="statsInfo">
+                    图像文件: 0个<br>
+                    Excel条目: 0条<br>
+                    匹配项: 0个
+                </div>
+            </div>
+            
+            <!-- 图像检测记录区域 -->
+            <div class="panel-section" id="detectionPanel" style="display: none;">
+                <h3>图像检测记录</h3>
+                
+                <!-- 错误类型选择 -->
+                <div class="error-type-section">
+                    <h4>错误类型</h4>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="errorType" value="文件缺失"> 文件缺失</label>
+                        <label><input type="checkbox" name="errorType" value="著录内容不全"> 著录内容不全</label>
+                        <label><input type="checkbox" name="errorType" value="著录内容错误"> 著录内容错误</label>
+                        <label><input type="checkbox" name="errorType" value="著录不一致"> 著录不一致</label>
+                        <label><input type="checkbox" name="errorType" value="其他"> 其他</label>
+                    </div>
+                </div>
+                
+                <!-- 著录信息项选择 -->
+                <div class="record-info-section">
+                    <h4>著录信息项</h4>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="recordInfo" value="序号"> 序号</label>
+                        <label><input type="checkbox" name="recordInfo" value="加工记录标识号"> 加工记录标识号</label>
+                        <label><input type="checkbox" name="recordInfo" value="内部序号"> 内部序号</label>
+                        <label><input type="checkbox" name="recordInfo" value="层级号"> 层级号</label>
+                        <label><input type="checkbox" name="recordInfo" value="卷目篇名"> 卷目篇名</label>
+                        <label><input type="checkbox" name="recordInfo" value="责任者"> 责任者</label>
+                        <label><input type="checkbox" name="recordInfo" value="册号"> 册号</label>
+                        <label><input type="checkbox" name="recordInfo" value="页码"> 页码</label>
+                    </div>
+                </div>
+                
+                <!-- 备注信息 -->
+                <div class="remark-section">
+                    <h4>备注信息</h4>
+                    <textarea id="remarkText" placeholder="请输入备注信息..." rows="3" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"></textarea>
+                </div>
+                
+                <!-- 保存当前图像检测记录 -->
+                <button class="btn" onclick="saveCurrentDetection()" style="margin-top: 10px;">保存检测记录</button>
+                
+                <!-- 导出Excel结果 -->
+                <button class="btn btn-warning" onclick="exportDetectionResults()" style="margin-top: 5px;">导出检测结果</button>
+            </div>
+        </div>
+
+        <!-- 调整手柄1: 控制面板和图像列表区之间 -->
+        <div class="resize-handle" id="handle1" onmousedown="startResize(event, 'controlPanel', 'imageListSection')"></div>
+
+        <!-- 中间区域容器 - 包含图像列表、图像显示区和目录结构 -->
+        <div class="middle-container" style="display: flex; flex: 1; min-width: 0; overflow: hidden;">
+            
+            <!-- 图像列表区 -->
+            <div class="image-list-section" id="imageListSection" style="flex: 0 0 auto; width: 200px; min-width: 150px; max-width: 400px; display: flex; flex-direction: column; overflow: hidden;">
+                <div class="image-header" style="padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #ddd; flex: 0 0 auto;">
+                    <h3 style="font-size: 14px; margin: 0;">图像列表</h3>
+                </div>
+                <div class="image-list-container" style="flex: 1; overflow-y: auto;">
+                    <div class="image-list-wrapper">
+                        <ul class="image-list" id="imageList"></ul>
+                    </div>
+                </div>
+
+                <!-- 调整手柄: 图像列表和横排目录结构之间 -->
+                <div class="resize-handle" id="handle2a" onmousedown="startResize(event, 'imageListSection', 'imageListSection')"></div>
+
+                <!-- 横排目录结构区 -->
+                <div class="tree-section-horizontal" id="treeSectionHorizontal" style="flex: 0 0 auto; height: 200px; min-height: 150px; max-height: 400px; display: flex; flex-direction: column; overflow: hidden;">
+                    <div class="tree-header" style="padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #ddd; flex: 0 0 auto;">
+                        <h3 style="font-size: 14px; margin: 0;">目录结构</h3>
+                    </div>
+                    <div class="tree-content-container" style="flex: 1; overflow-y: auto;">
+                        <div class="tree-content-wrapper">
+                            <div class="tree-content tree-content-horizontal" id="treeContentHorizontal"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 调整手柄2: 图像列表和图像显示区之间 -->
+            <div class="resize-handle" id="handle2" onmousedown="startResize(event, 'imageListSection', 'imageDisplayColumn')"></div>
+
+            <!-- 图像显示区 -->
+            <div class="image-display-column" id="imageDisplayColumn" style="flex: 1 1 0%; display: flex; flex-direction: column; min-width: 200px; overflow: hidden;">
+            <div class="image-display">
+                <div id="imageContainer" class="image-container">
+                    <div id="loadingIndicator" class="loading-indicator">加载中...</div>
+                    <img id="mainImage" style="max-width: 100%; max-height: 100%;" alt="图像显示区域">
+                </div>
+                <div class="controls-overlay">
+                    <button class="nav-btn" id="prevBtn" onclick="showImage(currentIndex - 1)" disabled>上一张（<）</button>
+                    <button class="reset-view-btn" onclick="resetView()">重置视图</button>
+                    <button class="nav-btn" id="nextBtn" onclick="showImage(currentIndex + 1)" disabled>下一张（>）</button>
+                </div>
+                <div id="excelOverlay" class="excel-overlay hidden">
+                    <h4>Excel数据</h4>
+                    <div id="excelContent"></div>
+                </div>
+                <button id="toggleOverlayBtn" class="toggle-overlay-btn" onclick="toggleExcelOverlay()" style="display: none;">✖</button>
+            </div>
+        </div>
+
+            <!-- 调整手柄3: 图像显示区和目录结构之间 -->
+            <div class="resize-handle" id="handle3" onmousedown="startResize(event, 'imageDisplayColumn', 'middleNavigation')"></div>
+
+            <!-- 目录结构区 -->
+            <div class="middle-navigation" id="middleNavigation" style="flex: 0 0 auto; width: 300px; min-width: 150px; max-width: 600px; display: flex; flex-direction: column; overflow: hidden;">
+                <div class="tree-header" style="padding: 10px; background-color: #f8f9fa; border-bottom: 1px solid #ddd; flex: 0 0 auto;">
+                    <h3 style="font-size: 14px; margin: 0;">目录结构</h3>
+                </div>
+                <div class="tree-content-container" style="flex: 1; overflow-y: auto;">
+                    <div class="tree-content-wrapper">
+                        <div class="tree-content" id="treeContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 有效期检查
+        function checkValidity() {
+            const expiryDate = new Date('2026-12-31T23:59:59');
+            const currentDate = new Date();
+            
+            if (currentDate > expiryDate) {
+                alert('');
+                // 禁用所有功能
+                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px; color: #dc3545;"></div>';
+                return false;
+            }
+            return true;
+        }
+        
+        // 在页面加载时检查有效期
+        if (!checkValidity()) {
+            // 如果已过期，停止后续代码执行
+            throw new Error('');
+        }
+
+        // 全局变量
+        let imageFiles = [];
+        let excelData = [];
+        let matchedItems = new Map(); // 使用Map存储匹配信息，key为图像索引，value为匹配的Excel数据数组
+        let currentIndex = -1;
+        let filteredImageItems = [];
+        let treeData = [];
+        let filteredTreeNodes = [];
+        let imageToTreeNodeMap = new Map(); // 图像索引到树节点的映射
+
+        // 检测记录相关变量
+        let detectionRecords = []; // 存储所有图像的检测记录
+        let currentDetectionRecord = null; // 当前图像的检测记录
+
+        // 图像缩放相关变量
+        let currentScale = 1;
+        let minScale = 0.1;
+        let maxScale = 5;
+        let isOverlayVisible = false;
+        let isDragging = false;
+        let startX, startY;
+        let startTranslateX, startTranslateY;
+        let translateX = 0;
+        let translateY = 0;
+        let currentTranslateX = 0;
+        let currentTranslateY = 0;
+
+        // DOM元素引用 - 只保留必要的元素
+        const imageInput = document.getElementById('imageInput');
+        const excelInput = document.getElementById('excelInput');
+        const treeContent = document.getElementById('treeContent');
+        const treeContentHorizontal = document.getElementById('treeContentHorizontal');
+        const imageList = document.getElementById('imageList');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const mainImage = document.getElementById('mainImage');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const statsInfo = document.getElementById('statsInfo');
+        const imageStats = document.getElementById('imageStats');
+        const excelInfo = document.getElementById('excelInfo');
+        const excelOverlay = document.getElementById('excelOverlay');
+        const excelContent = document.getElementById('excelContent');
+
+        // 事件监听器 - 只保留必要的事件监听器
+        if (imageInput) imageInput.addEventListener('change', handleFolderSelect);
+        if (excelInput) excelInput.addEventListener('change', handleExcelSelect);
+
+        // 自动保存事件监听器
+        document.querySelectorAll('input[name="errorType"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                if (currentDetectionRecord) {
+                    autoSaveCurrentDetection();
+                }
+            });
+        });
+
+        document.querySelectorAll('input[name="recordInfo"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                if (currentDetectionRecord) {
+                    autoSaveCurrentDetection();
+                }
+            });
+        });
+
+        const remarkText = document.getElementById('remarkText');
+        if (remarkText) {
+            remarkText.addEventListener('input', () => {
+                if (currentDetectionRecord) {
+                    autoSaveCurrentDetection();
+                }
+            });
+        }
+
+        // 渲染图像列表
+        function renderImageList() {
+            if (!imageList) {
+                console.error('imageList元素不存在');
+                return;
+            }
+            
+            imageList.innerHTML = '';
+            filteredImageItems = [];
+
+            imageFiles.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.className = 'image-item';
+                li.textContent = file.webkitRelativePath || file.name;
+                li.dataset.index = index;
+                
+                li.addEventListener('click', () => {
+                    showImage(index);
+                });
+
+                imageList.appendChild(li);
+                filteredImageItems.push({element: li, index: index, path: file.webkitRelativePath || file.name});
+            });
+
+            updateNavButtons();
+        }
+
+        // 处理文件夹选择
+        function handleFolderSelect(event) {
+            try {
+                const files = Array.from(event.target.files);
+                
+                // 记录文件夹选择信息
+                if (window.DebugMonitor) {
+                    window.DebugMonitor.debugLog('info', '开始处理图像文件', {
+                        totalFilesSelected: files.length,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
+                // 过滤出图像文件，增强类型检查
+                imageFiles = files.filter(file => {
+                    // 首先检查文件扩展名
+                    const ext = file.name.toLowerCase().split('.').pop();
+                    const validExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+                    
+                    // 然后也检查MIME类型
+                    const isImage = file.type.startsWith('image/') || validExts.includes(ext);
+                    
+                    return isImage;
+                });
+                
+                // 对图像文件进行排序：按路径和文件名从小到大排序
+                imageFiles.sort((a, b) => {
+                    const pathA = (a.webkitRelativePath || a.name).toLowerCase();
+                    const pathB = (b.webkitRelativePath || b.name).toLowerCase();
+                    
+                    // 按路径排序
+                    if (pathA < pathB) return -1;
+                    if (pathA > pathB) return 1;
+                    
+                    // 路径相同则按文件名排序
+                    const nameA = a.name.toLowerCase();
+                    const nameB = b.name.toLowerCase();
+                    
+                    // 自然排序：处理数字部分
+                    const regex = /(\d+)/g;
+                    const partsA = nameA.split(regex);
+                    const partsB = nameB.split(regex);
+                    
+                    for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
+                        // 如果是数字部分，按数值大小比较
+                        if (i % 2 === 1) { // 奇数索引是数字部分
+                            const numA = parseInt(partsA[i], 10);
+                            const numB = parseInt(partsB[i], 10);
+                            if (numA !== numB) {
+                                return numA - numB;
+                            }
+                        } else {
+                            // 文本部分按字母顺序比较
+                            if (partsA[i] < partsB[i]) return -1;
+                            if (partsA[i] > partsB[i]) return 1;
+                        }
+                    }
+                    
+                    // 如果前面的比较都相同，按长度排序
+                    return partsA.length - partsB.length;
+                });
+                
+                // 监控图像文件加载结果
+                if (window.DebugMonitor) {
+                    window.DebugMonitor.monitorImageFilesLoad(imageFiles);
+                }
+                
+                // 更新界面信息
+                updateImageInfo();
+                renderImageList();
+                updateStats();
+                
+                // 尝试自动匹配数据（如果已经加载了Excel数据）
+                if (excelData && excelData.length > 0) {
+                    setTimeout(matchData, 500);
+                }
+                
+                if (window.DebugMonitor) {
+                    window.DebugMonitor.debugLog('success', '图像文件处理完成', {
+                        filteredImageCount: imageFiles.length
+                    });
+                }
+            } catch (error) {
+                console.error('图像文件处理错误:', error);
+                if (window.DebugMonitor) {
+                    window.DebugMonitor.debugLog('error', '图像文件处理失败', { error: error.message });
+                }
+            }
+        }
+
+        // 更新图像信息显示
+        function updateImageInfo() {
+            // 更新左侧面板的图像统计信息
+            imageStats.textContent = `${imageFiles.length} 张图像`;
+        }
+        
+        // 处理Excel文件选择
+        function handleExcelSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 记录Excel文件信息
+            if (window.DebugMonitor) {
+                window.DebugMonitor.debugLog('info', '开始加载Excel文件', {
+                    fileName: file.name,
+                    fileSize: file.size,
+                    fileType: file.type
+                });
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                      
+                    // 读取Excel数据，并添加更健壮的错误处理
+                    excelData = XLSX.utils.sheet_to_json(firstSheet, {
+                        header: 1, // 先读取为数组格式
+                        defval: '' // 缺失值设置为空字符串
+                    });
+                      
+                    // 处理表头行
+                    if (excelData.length > 0) {
+                        const headers = excelData[0];
+                        // 转换为对象数组格式
+                        const jsonData = [];
+                        for (let i = 1; i < excelData.length; i++) {
+                            const row = {};
+                            headers.forEach((header, index) => {
+                                if (header && typeof header === 'string') {
+                                    // 标准化字段名，去除空格并统一大小写
+                                    const normalizedHeader = header.trim().replace(/\s+/g, '');
+                                    row[normalizedHeader] = excelData[i][index] || '';
+                                }
+                            });
+                            if (Object.keys(row).length > 0) {
+                                jsonData.push(row);
+                            }
+                        }
+                        excelData = jsonData;
+                    }
+                      
+                    // 监控Excel数据加载结果
+                    if (window.DebugMonitor) {
+                        window.DebugMonitor.monitorExcelDataLoad(excelData);
+                    }
+                      
+                    updateExcelInfo(file.name);
+                    updateStats();
+                      
+                    // 尝试自动匹配数据（如果已经加载了图像文件）
+                    if (imageFiles.length > 0) {
+                        setTimeout(matchData, 500);
+                    }
+                } catch (error) {
+                    console.error('Excel读取错误:', error);
+                    if (window.DebugMonitor) {
+                        window.DebugMonitor.debugLog('error', 'Excel文件读取失败', { error: error.message });
+                    }
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 更新Excel信息显示
+        function updateExcelInfo(filename) {
+            const infoDiv = document.getElementById('excelInfo');
+            infoDiv.innerHTML = `已导入: ${filename}<br>
+                                 数据条目: ${excelData.length} 条`;
+        }
+
+        // 图像缩放功能
+        function zoomIn() {
+            currentScale = Math.min(currentScale * 1.2, maxScale);
+            updateImageTransform();
+        }
+        
+        function zoomOut() {
+            currentScale = Math.max(currentScale / 1.2, minScale);
+            updateImageTransform();
+        }
+        
+        function updateImageTransform() {
+            mainImage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+        }
+        
+        // 重置视图
+        function resetView() {
+            currentScale = 1;
+            translateX = 0;
+            translateY = 0;
+            mainImage.style.transform = 'translate(0px, 0px) scale(1)';
+        }
+
+        // 更新图像信息显示
+        function updateImageInfo() {
+            // 更新左侧面板的图像统计信息
+            imageStats.textContent = `${imageFiles.length} 张图像`;
+        }
+        
+        // 构建树状结构数据
+        function buildTreeData() {
+            treeData = [];
+            const nodeMap = new Map();
+            imageToTreeNodeMap.clear();
+
+            // 创建所有节点
+            excelData.forEach((row, index) => {
+                const 层级号 = parseInt(row['层级号']) || 0;
+                const 卷目篇名 = row['卷目篇名'] || '';
+                const 责任者 = row['责任者'] || '';
+                const 加工记录标识号 = (row['加工记录标识号'] || '').toString().trim();
+                const 册号 = (row['册号'] || '').toString().trim();
+                const 页码 = (row['页码'] || '').toString().trim();
+                
+                if (卷目篇名) {
+                    const nodeId = `node-${index}`;
+                    const node = {
+                        id: nodeId,
+                        level: 层级号,
+                        title: 卷目篇名,
+                        author: 责任者,
+                        volume: 册号, // 新增：册数信息
+                        page: 页码, // 新增：页码信息
+                        data: row,
+                        index: index,
+                        children: [],
+                        imagePath: function() {
+                            if (!加工记录标识号 || !册号 || !页码) return '';
+                            try {
+                                // 确保页码是字符串类型并正确填充
+                                const pageStr = String(页码).trim();
+                                const paddedPage = pageStr.padStart(4, '0');
+                                // 构建新的标准路径格式：加工记录标识号/册号/页码.jpg
+                                return `${String(加工记录标识号).trim()}/${String(册号).trim()}/${paddedPage}.jpg`;
+                            } catch (e) {
+                                console.error('构建图像路径失败:', e);
+                                return '';
+                            }
+                        }(),
+                        parent: null
+                    };
+                    nodeMap.set(index, node);
+                }
+            });
+
+            // 建立父子关系
+            const nodes = Array.from(nodeMap.values());
+            nodes.sort((a, b) => {
+                // 首先按层级号排序
+                if (a.level !== b.level) {
+                    return a.level - b.level;
+                }
+                // 然后按原始索引排序
+                return a.index - b.index;
+            });
+
+            // 为每个节点找到合适的父节点
+            nodes.forEach(node => {
+                if (node.level > 1) {
+                    // 寻找同层级或上级的最近节点作为父节点
+                    for (let i = node.index - 1; i >= 0; i--) {
+                        const potentialParent = nodeMap.get(i);
+                        if (potentialParent && potentialParent.level < node.level) {
+                            potentialParent.children.push(node);
+                            node.parent = potentialParent;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // 找到根节点（层级号为1的节点）
+            treeData = nodes.filter(node => node.level === 1);
+            
+            // 清除之前的映射，由renderTree函数在渲染时建立新的严格匹配映射
+            imageToTreeNodeMap.clear();
+        }
+
+        // 渲染树状图
+        function renderTree() {
+            renderTreeToContainer(treeContent);
+            renderTreeToContainer(treeContentHorizontal);
+        }
+
+        function renderTreeToContainer(container) {
+            container.innerHTML = '';
+            if (treeData.length === 0) {
+                container.innerHTML = '<div style="padding: 10px; color: #666; font-size: 12px;">暂无目录数据</div>';
+                return;
+            }
+
+            function renderNode(node, container, level = 1) {
+                const div = document.createElement('div');
+                div.className = `tree-node level-${Math.min(level, 5)}`;
+                div.dataset.nodeId = node.id;
+                div.dataset.level = level;
+                
+                // 检查是否有匹配的图像
+                let isMatched = false;
+                let imageIndex = -1;
+                let bestMatchScore = -1; // 用于记录最佳匹配的分数
+                
+                // 只有在卷目篇名、加工记录标识号、册号、页码都存在的情况下才进行匹配
+                if (node.data && node.data['卷目篇名'] && node.data['加工记录标识号'] && node.data['册号'] && node.data['页码']) {
+                    // 获取节点的加工记录标识号、册号和页码
+                    const nodeRecordId = node.data['加工记录标识号'].toString().trim();
+                    const nodeVolume = node.data['册号'].toString().trim();
+                    const nodePage = node.data['页码'].toString().trim();
+                    const paddedNodePage = nodePage.padStart(4, '0');
+                    
+                    // 遍历所有图像文件，匹配加工记录标识号、册号和页码
+                    for (let i = 0; i < imageFiles.length; i++) {
+                        const file = imageFiles[i];
+                        const path = (file.webkitRelativePath || file.name).toLowerCase();
+                        let matchPath = path;
+                        if (path.includes('\\')) {
+                            matchPath = path.replace(/\\/g, '/');
+                        }
+                        const pathParts = matchPath.split('/');
+                        
+                        // 使用与matchData函数一致的匹配逻辑
+                        let recordMatch = false;
+                        let volMatch = false;
+                        let pageMatch = false;
+                        let recordFolder = '';
+                        let volumeFolder = '';
+                        
+                        // 匹配加工记录标识号（对应第二级文件夹名）
+                        if (pathParts.length >= 3) {
+                            recordFolder = pathParts[pathParts.length - 3];
+                            // 精确匹配第二级文件夹名，避免包含匹配导致的错误
+                            if (recordFolder === nodeRecordId || 
+                                parseInt(recordFolder) === parseInt(nodeRecordId)) {
+                                recordMatch = true;
+                            }
+                        }
+                        
+                        // 匹配册号（对应第三级文件夹名）
+                        if (pathParts.length >= 2) {
+                            volumeFolder = pathParts[pathParts.length - 2];
+                            // 精确匹配第三级文件夹名，避免包含匹配导致的错误
+                            if (volumeFolder === nodeVolume || 
+                                parseInt(volumeFolder) === parseInt(nodeVolume)) {
+                                volMatch = true;
+                            }
+                        }
+                        
+                        // 匹配页码（对应图像文件名）
+                        const fileName = pathParts[pathParts.length - 1];
+                        const fileWithoutExt = fileName.split('.')[0];
+                        if (fileWithoutExt === nodePage || 
+                            fileWithoutExt === paddedNodePage || 
+                            parseInt(fileWithoutExt) === parseInt(nodePage)) {
+                            pageMatch = true;
+                        }
+                        
+                        // 如果加工记录标识号、册号和页码都匹配，计算匹配分数
+                        if (recordMatch && volMatch && pageMatch) {
+                            // 计算匹配分数：完全匹配得3分，数字匹配得2分，其他匹配得1分
+                            let matchScore = 0;
+                            if (recordFolder === nodeRecordId) matchScore += 1;
+                            if (volumeFolder === nodeVolume) matchScore += 1;
+                            if (fileWithoutExt === nodePage) matchScore += 1;
+                            
+                            // 检查是否为完全精确匹配
+                            const isExactMatch = recordFolder === nodeRecordId && 
+                                               volumeFolder === nodeVolume && 
+                                               fileWithoutExt === nodePage;
+                            
+                            // 如果是完全精确匹配，立即建立映射关系并停止搜索
+                            if (isExactMatch) {
+                                isMatched = true;
+                                imageIndex = i;
+                                div.dataset.imageIndex = imageIndex;
+                                imageToTreeNodeMap.set(imageIndex, node);
+                                div.classList.add('matched');
+                                break; // 完全精确匹配，可以停止
+                            }
+                            
+                            // 如果不是完全精确匹配，但匹配分数更高，更新最佳匹配
+                            if (matchScore > bestMatchScore) {
+                                isMatched = true;
+                                imageIndex = i;
+                                bestMatchScore = matchScore;
+                                div.dataset.imageIndex = imageIndex;
+                                imageToTreeNodeMap.set(imageIndex, node);
+                                div.classList.add('matched');
+                            }
+                        }
+                    }
+                }
+
+                if (isMatched) {
+                    div.classList.add('matched');
+                }
+
+                // 构建节点内容
+                let nodeContent = `
+                    <div style="display: flex; align-items: flex-start;">
+                        <span class="expand-icon" style="${node.children.length > 0 ? '' : 'visibility: hidden;'}">
+                            ${node.children.length > 0 ? '▼' : ' '}
+                        </span>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; align-items: center; flex-wrap: wrap;">
+                                <div class="node-title" style="word-break: break-all; flex: 0 1 auto;">${node.title}</div>
+                                ${node.author ? `<span style="margin: 0 5px; color: #999;">|</span><span class="node-author" style="flex: 0 1 auto;">${node.author}</span>` : ''}
+                                ${node.volume ? `<span style="margin: 0 5px; color: #999;">|</span><span class="node-volume" style="flex: 0 1 auto; font-size: 10px; color: #666;">册: ${node.volume}</span>` : ''}
+                                ${node.page ? `<span style="margin: 0 5px; color: #999;">|</span><span class="node-page" style="flex: 0 1 auto; font-size: 10px; color: #666;">页: ${node.page}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                div.innerHTML = nodeContent;
+                
+                // 创建子节点容器
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'node-children';
+                childrenContainer.style.marginLeft = '20px';
+                // 默认显示子节点容器
+                if (node.children.length > 0) {
+                    childrenContainer.style.display = '';
+                }
+                
+                // 将子节点容器添加到div中
+                div.appendChild(childrenContainer);
+
+                // 为展开/收缩图标添加点击事件
+                const expandIcon = div.querySelector('.expand-icon');
+                if (expandIcon) {
+                    expandIcon.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 阻止事件冒泡
+                        div.classList.toggle('collapsed');
+                        expandIcon.textContent = div.classList.contains('collapsed') ? '▶' : '▼';
+                        childrenContainer.style.display = div.classList.contains('collapsed') ? 'none' : '';
+                    });
+                }
+
+                // 为节点本身添加点击事件
+                div.addEventListener('click', (e) => {
+                    // 如果点击的是展开/收缩图标，已经单独处理
+                    if (e.target.classList.contains('expand-icon')) {
+                        return;
+                    }
+                    // 如果有匹配的图像，则显示图像
+                    if (div.dataset.imageIndex !== undefined) {
+                        showImage(parseInt(div.dataset.imageIndex));
+                    }
+                });
+
+                // 递归渲染子节点到子节点容器中
+                node.children.forEach(child => {
+                    renderNode(child, childrenContainer, level + 1);
+                });
+
+                container.appendChild(div);
+            }
+
+            treeData.forEach(node => {
+                renderNode(node, container);
+            });
+
+            filteredTreeNodes = Array.from(document.querySelectorAll('.tree-node'));
+        }
+
+
+
+        // 执行数据匹配
+        function matchData() {
+            if (imageFiles.length === 0 || excelData.length === 0) {
+                return;
+            }
+
+            matchedItems.clear();
+            
+            // 开始匹配监控
+            if (window.DebugMonitor) {
+                window.DebugMonitor.startMatchMonitoring();
+            }
+            
+            // 创建Excel数据的映射，支持多种路径格式
+            const excelMap = new Map();
+            const recordPageMap = new Map(); // 加工记录标识号/页码映射
+            const recordIdMap = new Map(); // 加工记录标识号映射
+            
+            excelData.forEach((row, index) => {
+                const 加工记录标识号 = (row['加工记录标识号'] || '').toString().trim();
+                const 册号 = (row['册号'] || '').toString().trim();
+                const 页码 = (row['页码'] || '').toString().trim();
+                
+                if (加工记录标识号 && 册号 && 页码) {
+                    // 新的标准三层路径格式：加工记录标识号/册号/页码.jpg
+                    const key1 = `${加工记录标识号}/${册号}/${页码.padStart(4, '0')}.jpg`;
+                    // 加工记录标识号/页码格式
+                    const key2 = `${加工记录标识号}/${页码.padStart(4, '0')}.jpg`;
+                    // 加工记录标识号/页码（无扩展名）
+                    const key3 = `${加工记录标识号}/${页码.padStart(4, '0')}`;
+                    // 页码（仅文件名）
+                    const key4 = `${页码.padStart(4, '0')}.jpg`;
+                    
+                    // 存储所有可能的键值对
+                    [key1, key2, key3, key4].forEach(key => {
+                        if (!excelMap.has(key)) {
+                            excelMap.set(key, []);
+                        }
+                        excelMap.get(key).push({data: row, index: index});
+                    });
+                    
+                    // 存储加工记录标识号/页码映射
+                    const rpKey = `${加工记录标识号}/${页码.padStart(4, '0')}`;
+                    if (!recordPageMap.has(rpKey)) {
+                        recordPageMap.set(rpKey, []);
+                    }
+                    recordPageMap.get(rpKey).push({data: row, index: index});
+                    
+                    // 存储加工记录标识号映射
+                    if (!recordIdMap.has(加工记录标识号)) {
+                        recordIdMap.set(加工记录标识号, []);
+                    }
+                    recordIdMap.get(加工记录标识号).push({data: row, index: index});
+                }
+            });
+
+            // 匹配图像文件
+            imageFiles.forEach((file, index) => {
+                const path = (file.webkitRelativePath || file.name).toLowerCase();
+                // 处理不同的路径格式
+                let matchPath = path;
+                if (path.includes('\\')) {
+                    matchPath = path.replace(/\\/g, '/');
+                }
+                
+                // 记录匹配尝试
+                if (window.DebugMonitor) {
+                    window.DebugMonitor.logMatchAttempt(path, 'direct');
+                }
+                
+                // 尝试直接匹配
+                let matchedData = excelMap.get(matchPath);
+                
+                // 如果直接匹配失败，尝试解析路径的关键部分
+                if (!matchedData) {
+                    const pathParts = matchPath.split('/');
+                    
+                    // 情况1: 尝试提取最后三层（加工记录标识号/册号/页码）
+                    if (pathParts.length >= 3) {
+                        const recordFolder = pathParts[pathParts.length - 3]; // 第二级文件夹名 - 加工记录标识号
+                        const volumeFolder = pathParts[pathParts.length - 2]; // 第三级文件夹名 - 册号
+                        const fileName = pathParts[pathParts.length - 1]; // 文件名 - 页码
+                        const fileWithoutExt = fileName.split('.')[0];
+                        
+                        // 尝试加工记录标识号/册号/页码格式（与Excel数据格式一致）
+                        const vrpKey = `${recordFolder}/${volumeFolder}/${fileWithoutExt}`;
+                        matchedData = excelMap.get(vrpKey);
+                        
+                        // 如果直接匹配失败，尝试进行模糊匹配
+                        if (!matchedData) {
+                            // 遍历excelMap，寻找加工记录标识号、册号和页码的可能匹配
+                            for (const [key, items] of excelMap.entries()) {
+                                const keyParts = key.split('/');
+                                if (keyParts.length >= 3) {
+                                    const itemRecordId = keyParts[0].toString(); // 加工记录标识号（对应第二级文件夹名）
+                                    const itemVol = keyParts[1].toString(); // 册号（对应第三级文件夹名）
+                                    const itemPage = keyParts[2].toString().replace('.jpg', '');
+                                    const paddedPage = itemPage.padStart(4, '0');
+                                    
+                                    // 加工记录标识号匹配逻辑：支持完全匹配、包含匹配和数字部分匹配
+                                    const recordMatch = recordFolder === itemRecordId || 
+                                                       recordFolder.includes(itemRecordId) ||
+                                                       parseInt(recordFolder) === parseInt(itemRecordId);
+                                    
+                                    // 册号匹配逻辑增强：支持完全匹配、包含匹配和数字部分匹配
+                                    const volMatch = volumeFolder === itemVol || 
+                                                   volumeFolder.includes(itemVol) ||
+                                                   parseInt(volumeFolder) === parseInt(itemVol);
+                                    
+                                    // 页码匹配逻辑增强：支持完全匹配、填充后匹配、数字匹配
+                                    const pageMatch = fileWithoutExt === itemPage ||
+                                                    fileWithoutExt === paddedPage ||
+                                                    parseInt(fileWithoutExt) === parseInt(itemPage);
+                                    
+                                    if (recordMatch && volMatch && pageMatch) {
+                                        matchedData = items;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 尝试仅页码匹配
+                        if (!matchedData) {
+                            matchedData = excelMap.get(fileName) || excelMap.get(fileWithoutExt);
+                        }
+                    }
+                    
+                    // 情况2: 尝试查找路径中包含的加工记录标识号
+                    if (!matchedData) {
+                        for (const recordId of recordIdMap.keys()) {
+                            // 直接匹配完整的记录ID（不区分大小写）
+                            if (matchPath.toLowerCase().includes(recordId.toLowerCase())) {
+                                matchedData = recordIdMap.get(recordId);
+                                
+                                // 在找到记录ID后，进一步使用文件路径最后三层进行更精确的匹配
+                                if (matchedData && pathParts.length >= 3) {
+                                    const recordFolder = pathParts[pathParts.length - 3]; // 第二级文件夹名 - 加工记录标识号
+                                    const volumeFolder = pathParts[pathParts.length - 2]; // 第三级文件夹名 - 册号
+                                    const fileName = pathParts[pathParts.length - 1]; // 文件名 - 页码
+                                    const fileWithoutExt = fileName.split('.')[0];
+                                    
+                                    // 过滤出同时包含册号和页码的记录
+                                    matchedData = matchedData.filter(item => {
+                                        const itemVol = (item.data['册号'] || '').toString();
+                                        const itemPage = (item.data['页码'] || '').toString();
+                                        const paddedPage = itemPage.padStart(4, '0');
+                                        
+                                        // 册号匹配逻辑增强：支持完全匹配、包含匹配和数字部分匹配
+                                        const volMatch = volumeFolder === itemVol || 
+                                                       volumeFolder.includes(itemVol) ||
+                                                       parseInt(volumeFolder) === parseInt(itemVol);
+                                        
+                                        // 页码匹配逻辑增强：支持完全匹配、填充后匹配、数字匹配
+                                        const pageMatch = fileWithoutExt === itemPage ||
+                                                        fileWithoutExt === paddedPage ||
+                                                        parseInt(fileWithoutExt) === parseInt(itemPage);
+                                        
+                                        return volMatch && pageMatch;
+                                    });
+                                    
+                                    // 如果过滤后没有匹配项，重置为null
+                                    if (matchedData.length === 0) {
+                                        matchedData = null;
+                                    }
+                                }
+                                break;
+                            }
+                            // 从文件夹名中提取可能的记录ID前缀（忽略后面的文字，支持中文和特殊字符）
+                            const recordIdPattern = new RegExp(`(${recordId})[^\\/]*`);
+                            if (recordIdPattern.test(matchPath)) {
+                                matchedData = recordIdMap.get(recordId);
+                                
+                                // 在找到记录ID后，进一步使用文件路径最后两部分进行更精确的匹配
+                                if (matchedData && pathParts.length >= 2) {
+                                    const lastFolder = pathParts[pathParts.length - 2];
+                                    const fileName = pathParts[pathParts.length - 1];
+                                    const fileWithoutExt = fileName.split('.')[0];
+                                    
+                                    // 过滤出同时包含册号和页码的记录
+                                    matchedData = matchedData.filter(item => {
+                                        const itemVol = (item.data['册号'] || '').toString();
+                                        const itemPage = (item.data['页码'] || '').toString();
+                                        const paddedPage = itemPage.padStart(4, '0');
+                                        
+                                        // 册号匹配逻辑增强
+                                        const volMatch = lastFolder === itemVol || 
+                                                       lastFolder.includes(itemVol) ||
+                                                       parseInt(lastFolder) === parseInt(itemVol);
+                                        
+                                        // 页码匹配逻辑增强
+                                        const pageMatch = fileWithoutExt === itemPage ||
+                                                        fileWithoutExt === paddedPage ||
+                                                        parseInt(fileWithoutExt) === parseInt(itemPage);
+                                        
+                                        return volMatch && pageMatch;
+                                    });
+                                    
+                                    // 如果过滤后没有匹配项，重置为null
+                                    if (matchedData.length === 0) {
+                                        matchedData = null;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 情况3: 尝试更宽松的匹配 - 查找路径中是否包含加工记录标识号和页码
+                    if (!matchedData) {
+                        for (const rpKey of recordPageMap.keys()) {
+                            const [recordId, page] = rpKey.split('/');
+                            if (matchPath.includes(recordId) && 
+                                (matchPath.includes(page) || matchPath.includes(page.replace(/^0+/, '')))) {
+                                matchedData = recordPageMap.get(rpKey);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // 情况4: 处理实际文件夹结构 - 支持从文件夹名中提取加工记录标识号（忽略后面的文字）
+                    if (!matchedData && pathParts.length >= 3) {
+                        const recordFolder = pathParts[pathParts.length - 3]; // 第二级文件夹名 - 加工记录标识号
+                        // 尝试从文件夹名中提取16位数字的加工记录标识号
+                        const recordIdMatch = recordFolder.match(/(\d{16})/);
+                        if (recordIdMatch) {
+                            const extractedRecordId = recordIdMatch[1];
+                            matchedData = recordIdMap.get(extractedRecordId);
+                            
+                            // 如果找到了对应的记录ID，再进一步匹配册号和页码
+                            if (matchedData) {
+                                // 检查最后三层文件夹和文件名是否包含加工记录标识号、册号和页码
+                                const volumeFolder = pathParts[pathParts.length - 2]; // 第三级文件夹名 - 册号
+                                const fileName = pathParts[pathParts.length - 1]; // 文件名 - 页码
+                                const fileWithoutExt = fileName.split('.')[0];
+                                
+                                // 过滤出同时包含册号和页码的记录
+                                matchedData = matchedData.filter(item => {
+                                    const itemVol = (item.data['册号'] || '').toString();
+                                    const itemPage = (item.data['页码'] || '').toString();
+                                    const paddedPage = itemPage.padStart(4, '0');
+                                    
+                                    // 册号匹配逻辑增强：支持完全匹配、包含匹配和数字部分匹配
+                                    const volMatch = volumeFolder === itemVol || 
+                                                    volumeFolder.includes(itemVol) ||
+                                                    parseInt(volumeFolder) === parseInt(itemVol);
+                                    
+                                    // 页码匹配逻辑增强：支持完全匹配、填充后匹配、数字匹配
+                                    const pageMatch = fileWithoutExt === itemPage ||
+                                                     fileWithoutExt === paddedPage ||
+                                                     parseInt(fileWithoutExt) === parseInt(itemPage);
+                                    
+                                    return volMatch && pageMatch;
+                                });
+                                
+                                // 如果过滤后没有匹配项，重置为null
+                                if (matchedData.length === 0) {
+                                    matchedData = null;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 情况5: 支持嵌套文件夹结构，尝试多级匹配
+                    if (!matchedData) {
+                        // 从路径中提取所有可能的数字部分
+                        const numberParts = matchPath.match(/\d+/g) || [];
+                        
+                        // 尝试将长数字串拆分为加工记录标识号和册号
+                        for (const numPart of numberParts) {
+                            if (numPart.length >= 16) {
+                                // 尝试提取16位作为加工记录标识号
+                                const possibleRecordId = numPart.slice(0, 16);
+                                if (recordIdMap.has(possibleRecordId)) {
+                                    matchedData = recordIdMap.get(possibleRecordId);
+                                    
+                                    // 在找到记录ID后，进一步使用文件路径最后三层进行更精确的匹配
+                                    if (matchedData && pathParts.length >= 3) {
+                                        const recordFolder = pathParts[pathParts.length - 3]; // 第二级文件夹名 - 加工记录标识号
+                                        const volumeFolder = pathParts[pathParts.length - 2]; // 第三级文件夹名 - 册号
+                                        const fileName = pathParts[pathParts.length - 1]; // 文件名 - 页码
+                                        const fileWithoutExt = fileName.split('.')[0];
+                                        
+                                        // 过滤出同时包含册号和页码的记录
+                                        matchedData = matchedData.filter(item => {
+                                            const itemVol = (item.data['册号'] || '').toString();
+                                            const itemPage = (item.data['页码'] || '').toString();
+                                            const paddedPage = itemPage.padStart(4, '0');
+                                            
+                                            // 册号匹配逻辑增强：支持完全匹配、包含匹配和数字部分匹配
+                                            const volMatch = volumeFolder === itemVol || 
+                                                            volumeFolder.includes(itemVol) ||
+                                                            parseInt(volumeFolder) === parseInt(itemVol);
+                                            
+                                            // 页码匹配逻辑增强：支持完全匹配、填充后匹配、数字匹配
+                                            const pageMatch = fileWithoutExt === itemPage ||
+                                                             fileWithoutExt === paddedPage ||
+                                                             parseInt(fileWithoutExt) === parseInt(itemPage);
+                                            
+                                            return volMatch && pageMatch;
+                                        });
+                                        
+                                        // 如果过滤后没有匹配项，重置为null
+                                        if (matchedData.length === 0) {
+                                            matchedData = null;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (matchedData) {
+                    matchedItems.set(index, matchedData);
+                    // 记录匹配成功
+                    if (window.DebugMonitor) {
+                        window.DebugMonitor.logMatchSuccess(path, 'matched', matchedData);
+                    }
+                } else {
+                    // 记录匹配失败
+                    if (window.DebugMonitor) {
+                        window.DebugMonitor.logMatchFailure(path, 'no matching strategy found');
+                    }
+                }
+            });
+            
+            // 结束匹配监控
+            if (window.DebugMonitor) {
+                window.DebugMonitor.endMatchMonitoring();
+            }
+
+            // 构建并渲染树状图
+            buildTreeData();
+            renderTree();
+
+            // 更新UI
+            updateImageListHighlight();
+            updateStats();
+        }
+
+        // 更新图像列表高亮
+        function updateImageListHighlight() {
+            const items = imageList.querySelectorAll('.image-item');
+            items.forEach((item, index) => {
+                item.classList.remove('matched');
+                if (matchedItems.has(index)) {
+                    item.classList.add('matched');
+                }
+            });
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const statsInfo = document.getElementById('statsInfo');
+            // 获取调试监控中的匹配数量，如果存在的话
+            const matchCount = window.DebugMonitor && window.DebugMonitor.getMatchCount ? 
+                window.DebugMonitor.getMatchCount() : matchedItems.size;
+            
+            statsInfo.innerHTML = `
+                图像文件: ${imageFiles.length}个<br>
+                Excel条目: ${excelData.length}条<br>
+                匹配项: ${matchCount}个
+            `;
+        }
+
+        // 显示图像
+        function showImage(index) {
+            if (index < 0 || index >= imageFiles.length) return;
+
+            // 自动保存当前图像的检测记录（在切换之前）
+            if (currentIndex >= 0 && currentDetectionRecord) {
+                autoSaveCurrentDetection();
+            }
+
+            currentIndex = index;
+            const file = imageFiles[index];
+             
+            // 更新图像列表当前项样式
+            document.querySelectorAll('.image-item').forEach((item, i) => {
+                item.classList.remove('current');
+                if (i === index) {
+                    item.classList.add('current');
+                    item.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'center'});
+                }
+            });
+
+            // 更新树状图当前项样式
+            document.querySelectorAll('.tree-node').forEach(node => {
+                node.classList.remove('current');
+            });
+             
+            // 高亮对应的树节点
+            const treeNode = imageToTreeNodeMap.get(index);
+            if (treeNode) {
+                const nodeElements = document.querySelectorAll(`[data-node-id="${treeNode.id}"]`);
+                nodeElements.forEach(nodeElement => {
+                    nodeElement.classList.add('current');
+                    nodeElement.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'center'});
+                });
+            }
+
+            // 显示加载指示器
+            loadingIndicator.style.display = '';
+            mainImage.style.display = 'none';
+
+            // 显示图像
+            try {
+                const url = URL.createObjectURL(file);
+                mainImage.src = url;
+                    
+                  // 添加图像加载监控
+                  const onLoadCallback = window.DebugMonitor ? 
+                      window.DebugMonitor.startImageLoadingMonitor(url) : 
+                      null;
+                    
+                  mainImage.onload = function() {
+                      loadingIndicator.style.display = 'none';
+                      mainImage.style.display = '';
+                      // 图像加载完成后重置缩放
+                      resetView();
+                          
+                      // 调用加载完成回调
+                  if (onLoadCallback) {
+                      onLoadCallback();
+                  }
+              };
+              mainImage.onerror = function(e) {
+                  loadingIndicator.style.display = 'none';
+                  console.error('图像加载错误:', e);
+                  if (window.DebugMonitor) {
+                      window.DebugMonitor.debugLog('error', '图像加载失败', { file: file.name });
+                  }
+              };
+          } catch (error) {
+              loadingIndicator.style.display = 'none';
+              console.error('图像显示错误:', error);
+              if (window.DebugMonitor) {
+                  window.DebugMonitor.debugLog('error', '图像显示出错', { file: file.name, error: error.message });
+              }
+          }
+            
+          // 显示检测记录面板并加载当前图像的检测记录
+          showDetectionPanel(index);
+          
+          // 显示Excel数据（如果匹配）
+          showExcelDataForImage(index);
+              
+          // 更新导航按钮
+          updateNavButtons();
+     }
+         
+         // 显示检测记录面板并加载当前图像的检测记录
+          function showDetectionPanel(imageIndex) {
+              const detectionPanel = document.getElementById('detectionPanel');
+              
+              // 显示检测记录面板
+              detectionPanel.style.display = 'block';
+              
+              // 加载当前图像的检测记录
+              loadCurrentDetectionRecord(imageIndex);
+          }
+
+          // 加载当前图像的检测记录
+          function loadCurrentDetectionRecord(imageIndex) {
+              // 查找当前图像的检测记录
+              currentDetectionRecord = detectionRecords.find(record => record.imageIndex === imageIndex);
+              
+              if (!currentDetectionRecord) {
+                  // 如果没有找到记录，创建新的记录
+                  currentDetectionRecord = {
+                      imageIndex: imageIndex,
+                      fileName: imageFiles[imageIndex]?.name || '',
+                      errorTypes: [],
+                      recordInfo: [],
+                      remark: '',
+                      matchedData: null
+                  };
+              }
+              
+              // 更新UI显示
+              updateDetectionPanelUI();
+          }
+
+          // 更新检测记录面板的UI
+          function updateDetectionPanelUI() {
+              if (!currentDetectionRecord) return;
+              
+              // 更新错误类型复选框
+              document.querySelectorAll('input[name="errorType"]').forEach(checkbox => {
+                  checkbox.checked = currentDetectionRecord.errorTypes.includes(checkbox.value);
+              });
+              
+              // 更新著录信息项复选框
+              document.querySelectorAll('input[name="recordInfo"]').forEach(checkbox => {
+                  checkbox.checked = currentDetectionRecord.recordInfo.includes(checkbox.value);
+              });
+              
+              // 更新备注信息
+              document.getElementById('remarkText').value = currentDetectionRecord.remark || '';
+          }
+
+          // 自动保存当前图像的检测记录（不显示提示）
+          function autoSaveCurrentDetection() {
+              if (!currentDetectionRecord || currentIndex < 0) {
+                  return;
+              }
+              
+              // 收集错误类型
+              currentDetectionRecord.errorTypes = [];
+              document.querySelectorAll('input[name="errorType"]:checked').forEach(checkbox => {
+                  currentDetectionRecord.errorTypes.push(checkbox.value);
+              });
+              
+              // 收集著录信息项
+              currentDetectionRecord.recordInfo = [];
+              document.querySelectorAll('input[name="recordInfo"]:checked').forEach(checkbox => {
+                  currentDetectionRecord.recordInfo.push(checkbox.value);
+              });
+              
+              // 收集备注信息
+              currentDetectionRecord.remark = document.getElementById('remarkText').value;
+              
+              // 获取匹配的Excel数据
+              const matchedData = matchedItems.get(currentIndex);
+              if (matchedData && matchedData.length > 0) {
+                  currentDetectionRecord.matchedData = matchedData[0];
+              }
+              
+              // 保存到检测记录数组
+              const existingIndex = detectionRecords.findIndex(record => record.imageIndex === currentDetectionRecord.imageIndex);
+              if (existingIndex >= 0) {
+                  detectionRecords[existingIndex] = currentDetectionRecord;
+              } else {
+                  detectionRecords.push(currentDetectionRecord);
+              }
+              
+              console.log('检测记录已自动保存:', currentDetectionRecord.fileName);
+          }
+
+          // 保存当前图像的检测记录
+          function saveCurrentDetection() {
+              if (!currentDetectionRecord || currentIndex < 0) {
+                  alert('请先选择一张图像');
+                  return;
+              }
+              
+              // 调用自动保存函数
+              autoSaveCurrentDetection();
+              
+              alert('检测记录已保存');
+          }
+
+          // 导出检测结果到Excel
+          function exportDetectionResults() {
+              if (detectionRecords.length === 0) {
+                  alert('没有检测记录可导出');
+                  return;
+              }
+              
+              try {
+                  // 创建工作簿
+                  const wb = XLSX.utils.book_new();
+                  
+                  // 准备数据
+                  const data = detectionRecords.map(record => {
+                      const row = {
+                          '加工记录标识号': record.matchedData?.data?.['加工记录标识号'] || '',
+                          '著录表名称': '表4',
+                          '序号': record.matchedData?.data?.['序号'] || '',
+                          '册次': record.matchedData?.data?.['册号'] || '',
+                          '页面名称': record.matchedData?.data?.['页码'] || '',
+                          '著录信息项': record.recordInfo.join('、') || '',
+                          '文件缺失': record.errorTypes.includes('文件缺失') ? '1' : '',
+                          '著录内容不全': record.errorTypes.includes('著录内容不全') ? '1' : '',
+                          '著录内容错误': record.errorTypes.includes('著录内容错误') ? '1' : '',
+                          '著录不一致': record.errorTypes.includes('著录不一致') ? '1' : '',
+                          '其他': record.errorTypes.includes('其他') ? '1' : '',
+                          '备注信息': record.remark || ''
+                      };
+                      
+                      // 添加著录信息项的具体内容
+                      if (record.matchedData?.data) {
+                          // 使用标准化的字段名访问数据
+                          const dataFields = record.matchedData.data;
+                          if (record.recordInfo.includes('序号')) row['序号内容'] = dataFields['序号'] || dataFields['序号'.replace(/\\s+/g, '')] || '';
+                          if (record.recordInfo.includes('加工记录标识号')) row['加工记录标识号内容'] = dataFields['加工记录标识号'] || dataFields['加工记录标识号'.replace(/\\s+/g, '')] || '';
+                          if (record.recordInfo.includes('内部序号')) row['内部序号内容'] = dataFields['内部序号'] || dataFields['内部序号'.replace(/\\s+/g, '')] || '';
+                          if (record.recordInfo.includes('层级号')) row['层级号内容'] = dataFields['层级号'] || dataFields['层级号'.replace(/\\s+/g, '')] || '';
+                          if (record.recordInfo.includes('卷目篇名')) row['卷目篇名内容'] = dataFields['卷目篇名'] || dataFields['卷目篇名'.replace(/\\s+/g, '')] || '';
+                          if (record.recordInfo.includes('责任者')) row['责任者内容'] = dataFields['责任者'] || dataFields['责任者'.replace(/\\s+/g, '')] || '';
+                      }
+                      
+                      return row;
+                  });
+                  
+                  // 创建工作表
+                  const ws = XLSX.utils.json_to_sheet(data);
+                  
+                  // 设置列宽
+                  const colWidths = [
+                      {wch: 15}, // 加工记录标识号
+                      {wch: 10}, // 著录表名称
+                      {wch: 8},  // 序号
+                      {wch: 8},  // 册次
+                      {wch: 12}, // 页面名称
+                      {wch: 20}, // 著录信息项
+                      {wch: 8},  // 文件缺失
+                      {wch: 12}, // 著录内容不全
+                      {wch: 12}, // 著录内容错误
+                      {wch: 12}, // 著录不一致
+                      {wch: 8},  // 其他
+                      {wch: 20}, // 备注信息
+                      {wch: 12}, // 序号内容
+                      {wch: 15}, // 加工记录标识号内容
+                      {wch: 12}, // 内部序号内容
+                      {wch: 12}, // 层级号内容
+                      {wch: 20}, // 卷目篇名内容
+                      {wch: 15}  // 责任者内容
+                  ];
+                  ws['!cols'] = colWidths;
+                  
+                  // 添加工作表到工作簿
+                  XLSX.utils.book_append_sheet(wb, ws, '检测结果');
+                  
+                  // 导出Excel文件
+                  const fileName = `古籍检测结果_${new Date().toISOString().slice(0, 10)}.xlsx`;
+                  XLSX.writeFile(wb, fileName);
+                  
+                  alert(`检测结果已导出为 ${fileName}`);
+                  
+              } catch (error) {
+                  console.error('导出Excel失败:', error);
+                  alert('导出失败，请检查数据格式');
+              }
+          }
+
+          // 显示图像对应的Excel数据
+          function showExcelDataForImage(index) {
+              hideExcelOverlay();
+               
+              if (!matchedItems.has(index)) {
+                  return;
+              }
+              
+             const matchedDataArray = matchedItems.get(index);
+             if (!matchedDataArray || matchedDataArray.length === 0) {
+                 return;
+             }
+              
+             let html = '';
+             matchedDataArray.forEach((matchedData, dataIndex) => {
+                 if (dataIndex > 0) {
+                     html += '<hr style="border: 0.5px solid #eee; margin: 10px 0;">';
+                 }
+                  
+                 html += '<div class="excel-item">';
+                 Object.keys(matchedData.data).forEach(key => {
+                     html += `<div class="excel-row"><span class="excel-label">${key}:</span> ${matchedData.data[key]}</div>`;
+                 });
+                 html += '</div>';
+             });
+              
+             excelContent.innerHTML = html;
+         }
+        
+        // 显示Excel数据覆盖层
+        function toggleExcelOverlay() {
+            if (matchedItems.has(currentIndex) && matchedItems.get(currentIndex)) {
+                if (isExcelOverlayVisible) {
+                    hideExcelOverlay();
+                } else {
+                    showExcelOverlay();
+                }
+            }
+        }
+        
+        function showExcelOverlay() {
+            excelOverlay.style.display = 'block';
+            isExcelOverlayVisible = true;
+        }
+        
+        function hideExcelOverlay() {
+            excelOverlay.style.display = 'none';
+            isExcelOverlayVisible = false;
+        }
+        
+        // 更新导航按钮状态
+        function updateNavButtons() {
+            prevBtn.disabled = currentIndex <= 0;
+            nextBtn.disabled = currentIndex >= imageFiles.length - 1 || imageFiles.length === 0;
+        }
+        
+        // 上一张图像
+        function previousImage() {
+            if (currentIndex > 0) {
+                showImage(currentIndex - 1);
+            }
+        }
+        
+        // 下一张图像
+        function nextImage() {
+            if (currentIndex < imageFiles.length - 1) {
+                showImage(currentIndex + 1);
+            }
+        }
+        
+        // 图像缩放功能
+        function zoomIn() {
+            currentScale = Math.min(currentScale * 1.2, maxScale);
+            updateImageTransform();
+        }
+        
+        function zoomOut() {
+            currentScale = Math.max(currentScale / 1.2, minScale);
+            updateImageTransform();
+        }
+        
+        function updateImageTransform() {
+            mainImage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+            
+            // 更新按钮状态
+            zoomInBtn.disabled = currentScale >= maxScale;
+            zoomOutBtn.disabled = currentScale <= minScale;
+        }
+        
+        // 重置视图
+        function resetView() {
+            currentScale = 1;
+            translateX = 0;
+            translateY = 0;
+            mainImage.style.transform = 'translate(0px, 0px) scale(1)';
+            zoomInBtn.disabled = false;
+            zoomOutBtn.disabled = false;
+        }
+        
+        // 更新图像信息显示
+        function updateImageInfo() {
+            // 更新左侧面板的图像统计信息
+            imageStats.textContent = `${imageFiles.length} 张图像`;
+        }
+        
+        // 重置所有数据
+        function resetAll() {
+            imageFiles = [];
+            excelData = [];
+            matchedItems.clear();
+            treeData = [];
+            imageToTreeNodeMap.clear();
+            currentIndex = -1;
+            isExcelOverlayVisible = false;
+            
+            // 清空UI
+            imageInput.value = '';
+            excelInput.value = '';
+            treeContent.innerHTML = '';
+            imageList.innerHTML = '';
+            mainImage.style.display = 'none';
+            mainImage.src = '';
+            hideExcelOverlay();
+             
+             // 重置状态
+             resetView();
+             updateImageInfo();
+             // 重置Excel信息
+             excelInfo.innerHTML = '未导入Excel文件';
+             updateStats();
+             updateNavButtons();
+         }
+          
+         // 键盘快捷键
+         document.addEventListener('keydown', function(event) {
+             // 防止在输入框中触发
+             if (event.target.tagName === 'INPUT') return;
+              
+             switch(event.key) {
+                 case 'ArrowLeft':
+                     previousImage();
+                     break;
+                 case 'ArrowRight':
+                     nextImage();
+                     break;
+                 case '+':
+                 case '=':
+                     zoomIn();
+                     break;
+                 case '-':
+                 case '_':
+                     zoomOut();
+                     break;
+                 case '0':
+                     resetView();
+                     break;
+                 case 'e':
+                 case 'E':
+                     toggleExcelOverlay();
+                     break;
+             }
+         });
+          
+         // 窗口大小改变时调整图像
+         window.addEventListener('resize', function() {
+             if (currentIndex >= 0 && currentIndex < imageFiles.length) {
+                 resetView(); // 重置视图以适应新窗口大小
+             }
+         });
+          
+         // 初始化
+         window.onload = function() {
+         };
+
+         // 调整大小相关变量
+         let isResizing = false;
+         let resizeStartX = 0;
+         let resizeStartWidth = 0;
+         let currentResizedElement = null;
+         let siblingElement = null;
+
+         // 开始调整大小
+         function startResize(event, elementId, siblingId) {
+             isResizing = true;
+             currentResizedElement = document.getElementById(elementId);
+             siblingElement = document.getElementById(siblingId);
+             resizeStartX = event.clientX;
+             resizeStartWidth = currentResizedElement.offsetWidth;
+             
+             // 添加事件监听器
+             document.addEventListener('mousemove', resize);
+             document.addEventListener('mouseup', stopResize);
+             
+             // 防止选择文本
+             document.body.style.userSelect = 'none';
+         }
+
+         // 调整大小
+         function resize(event) {
+             if (!isResizing || !currentResizedElement) return;
+
+             const deltaX = event.clientX - resizeStartX;
+             
+             // 根据不同的调整手柄处理不同的逻辑
+             if (currentResizedElement.id === 'imageDisplayColumn') {
+                 // 调整图像显示区宽度（同时调整目录结构区）
+                 const newWidth = resizeStartWidth + deltaX;
+                 const containerWidth = document.querySelector('.container').offsetWidth;
+                 const minWidth = 200;
+                 const maxWidth = containerWidth - 300; // 预留最小空间给其他区域
+                 
+                 if (newWidth >= minWidth && newWidth <= maxWidth) {
+                     currentResizedElement.style.flex = '0 0 auto';
+                     currentResizedElement.style.width = newWidth + 'px';
+                     
+                     // 同时调整目录结构区的flex属性
+                     if (siblingElement) {
+                         siblingElement.style.flex = '1 1 0%';
+                     }
+                 }
+             } else if (currentResizedElement.id === 'middleNavigation') {
+                 // 调整目录结构区宽度
+                 const newWidth = resizeStartWidth + deltaX;
+                 const minWidth = 150;
+                 const maxWidth = 600;
+                 
+                 if (newWidth >= minWidth && newWidth <= maxWidth) {
+                     currentResizedElement.style.width = newWidth + 'px';
+                 }
+             } else if (currentResizedElement.id === 'controlPanel') {
+                 // 调整控制面板宽度
+                 const newWidth = resizeStartWidth + deltaX;
+                 const minWidth = 120;
+                 const maxWidth = 300;
+                 
+                 if (newWidth >= minWidth && newWidth <= maxWidth) {
+                     currentResizedElement.style.width = newWidth + 'px';
+                 }
+             } else {
+                 // 其他区域的调整（保持原有逻辑）
+                 const newWidth = resizeStartWidth + deltaX;
+                 if (newWidth < 50) return;
+                 currentResizedElement.style.width = newWidth + 'px';
+             }
+         }
+
+         // 停止调整大小
+         function stopResize() {
+             isResizing = false;
+             currentResizedElement = null;
+             siblingElement = null;
+             
+             // 移除事件监听器
+             document.removeEventListener('mousemove', resize);
+             document.removeEventListener('mouseup', stopResize);
+             
+             // 恢复选择文本
+             document.body.style.userSelect = '';
+         }
+     </script>
+</body>
 </html>
