@@ -1,11 +1,1193 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>PakePlus</title>
-    </head>
-    <body>
-        PakePlus
-    </body>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>图像分割工具</title>
+    <style>
+        :root {
+            --primary-color: #007AFF;
+            --secondary-color: #5AC8FA;
+            --background-color: #F2F2F7;
+            --surface-color: #FFFFFF;
+            --text-primary: #000000;
+            --text-secondary: #8E8E93;
+            --border-color: #C7C7CC;
+            --error-color: #FF3B30;
+            --success-color: #34C759;
+            --warning-color: #FF9500;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        body {
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            font-size: 17px;
+            line-height: 1.4;
+            overflow-x: hidden;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        /* 顶部状态栏 */
+        .status-bar {
+            height: 44px;
+            background-color: var(--surface-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding-top: env(safe-area-inset-top);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+        }
+        
+        .status-bar h1 {
+            font-size: 17px;
+            font-weight: 600;
+        }
+        
+        /* 内容区域 */
+        .content {
+            margin-top: 44px;
+            padding-bottom: 80px;
+        }
+        
+        /* 页面容器 */
+        .page {
+            display: none;
+            padding: 16px;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background-color: var(--surface-color);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 14px 20px;
+            font-size: 17px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 12px;
+            -webkit-appearance: none;
+        }
+        
+        .btn:active {
+            opacity: 0.8;
+            transform: scale(0.98);
+        }
+        
+        .btn-secondary {
+            background-color: var(--surface-color);
+            color: var(--primary-color);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-danger {
+            background-color: var(--error-color);
+        }
+        
+        .btn-success {
+            background-color: var(--success-color);
+        }
+        
+        .btn-icon {
+            margin-right: 8px;
+            font-size: 20px;
+        }
+        
+        /* 底部导航栏 */
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background-color: var(--surface-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: env(safe-area-inset-bottom);
+            border-top: 1px solid var(--border-color);
+            z-index: 1000;
+        }
+        
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            height: 100%;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+            text-decoration: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .tab-item:active {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        
+        .tab-item.active {
+            color: var(--primary-color);
+        }
+        
+        .tab-icon {
+            font-size: 22px;
+            margin-bottom: 4px;
+        }
+        
+        .tab-label {
+            font-size: 10px;
+            font-weight: 500;
+        }
+        
+        /* 图像列表 */
+        .image-list {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .image-item {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .image-item:active {
+            opacity: 0.8;
+        }
+        
+        .image-item.active {
+            border-color: var(--primary-color);
+        }
+        
+        .image-thumb {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .image-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 11px;
+            padding: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: var(--border-color);
+        }
+        
+        /* 图像操作区域 */
+        .image-container {
+            position: relative;
+            width: 100%;
+            height: 320px;
+            background-color: #000;
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 16px;
+            touch-action: none;
+        }
+        
+        #imageCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: contain;
+        }
+        
+        .divider-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: var(--warning-color);
+            cursor: ew-resize;
+            z-index: 10;
+            transform: translateX(-50%);
+            pointer-events: auto;
+        }
+        
+        .divider-handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 60px;
+            background-color: var(--warning-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* 分割控制 */
+        .split-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .split-controls .btn {
+            flex: 1;
+            margin-bottom: 0;
+            padding: 12px;
+            font-size: 15px;
+        }
+        
+        /* 预览区域 */
+        .preview-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .preview-box {
+            flex: 1;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: var(--surface-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .preview-title {
+            padding: 12px;
+            background-color: #F8F8F8;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .preview-img {
+            width: 100%;
+            height: 120px;
+            object-fit: contain;
+            background-color: white;
+        }
+        
+        /* 设置区域 */
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+        }
+        
+        .setting-label {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        .radio-group {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+        }
+        
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .radio-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary-color);
+        }
+        
+        /* 进度条 */
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 4px;
+            background-color: var(--border-color);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .progress-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+        
+        /* 提示信息 */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            z-index: 1001;
+            transition: transform 0.3s;
+            max-width: 80%;
+            text-align: center;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        /* 文件输入隐藏 */
+        #fileInput {
+            display: none;
+        }
+        
+        /* 适配不同屏幕尺寸 */
+        @media (min-width: 768px) {
+            .container {
+                max-width: 414px;
+                margin: 0 auto;
+                position: relative;
+                background-color: var(--background-color);
+                min-height: 100vh;
+                box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            }
+            
+            body {
+                background-color: #666;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+            }
+        }
+        
+        /* 防止文本选择 */
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        /* 文件名格式说明 */
+        .format-info {
+            background-color: #F8F8F8;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部状态栏 -->
+        <div class="status-bar">
+            <h1>图像分割工具</h1>
+        </div>
+        
+        <!-- 内容区域 -->
+        <div class="content">
+            <!-- 图像库页面 -->
+            <div id="library-page" class="page active">
+                <div class="card">
+                    <div class="card-title">
+                        <span>选择图像</span>
+                        <span id="imageCount">0 张</span>
+                    </div>
+                    <button class="btn" id="selectImagesBtn">
+                        <i class="fas fa-images btn-icon"></i>
+                        <span>选择图像文件</span>
+                    </button>
+                    <input type="file" id="fileInput" accept="image/*" multiple>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">已选图像</div>
+                    <div class="image-list" id="imageList">
+                        <div class="empty-state" id="emptyImageList">
+                            <i class="fas fa-image empty-icon"></i>
+                            <p>尚未选择任何图像</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-danger" id="clearAllBtn">
+                    <i class="fas fa-trash-alt btn-icon"></i>
+                    <span>清除所有图像</span>
+                </button>
+            </div>
+            
+            <!-- 分割页面 -->
+            <div id="split-page" class="page">
+                <div class="card">
+                    <div class="card-title">图像分割</div>
+                    <div class="image-container" id="imageContainer">
+                        <div class="empty-state" id="emptyOperationArea">
+                            <i class="fas fa-image empty-icon"></i>
+                            <p>请选择一张图像</p>
+                        </div>
+                        <canvas id="imageCanvas"></canvas>
+                        <div class="divider-line" id="dividerLine" style="display: none;">
+                            <div class="divider-handle">
+                                <i class="fas fa-arrows-alt-h"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="split-controls">
+                        <button class="btn btn-secondary" id="resetDividerBtn">
+                            <i class="fas fa-redo btn-icon"></i>
+                            <span>重置</span>
+                        </button>
+                        <button class="btn" id="splitCurrentBtn">
+                            <i class="fas fa-cut btn-icon"></i>
+                            <span>分割</span>
+                        </button>
+                        <button class="btn btn-secondary" id="applyToAllBtn">
+                            <i class="fas fa-clone btn-icon"></i>
+                            <span>应用全部</span>
+                        </button>
+                    </div>
+                    
+                    <div class="card-title">分割预览</div>
+                    <div class="preview-container">
+                        <div class="preview-box">
+                            <div class="preview-title">左侧</div>
+                            <img id="leftPreview" class="preview-img" src="" alt="左侧预览">
+                        </div>
+                        <div class="preview-box">
+                            <div class="preview-title">右侧</div>
+                            <img id="rightPreview" class="preview-img" src="" alt="右侧预览">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 设置页面 -->
+            <div id="settings-page" class="page">
+                <div class="card">
+                    <div class="card-title">批量处理</div>
+                    
+                    <div class="setting-item">
+                        <label class="setting-label">文件名格式</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" id="format1" name="format" value="original" checked>
+                                <span>原文件名_左/右</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" id="format2" name="format" value="numbered">
+                                <span>序号_左/右</span>
+                            </label>
+                        </div>
+                        <div class="format-info">
+                            分割后的图像将自动保存到与原图像相同的位置
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-success" id="splitAllBtn">
+                        <i class="fas fa-bolt btn-icon"></i>
+                        <span>批量分割所有图像</span>
+                    </button>
+                    
+                    <div class="progress-container" id="progressContainer">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">准备中...</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">使用说明</div>
+                    <div style="font-size: 15px; color: var(--text-secondary); line-height: 1.5;">
+                        <p>1. 在"图像库"中选择要分割的图像</p>
+                        <p>2. 在"分割"页面调整分割线位置</p>
+                        <p>3. 点击"分割"按钮自动保存到原位置</p>
+                        <p>4. 点击"应用全部"将当前分割线应用到所有图像</p>
+                        <p>5. 在"设置"中批量处理所有图像</p>
+                        <p style="margin-top: 12px; color: var(--warning-color); font-weight: 500;">
+                            注：分割结果将自动保存到图像原路径
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部导航栏 -->
+        <div class="tab-bar">
+            <div class="tab-item active" data-page="library-page">
+                <i class="fas fa-images tab-icon"></i>
+                <span class="tab-label">图像库</span>
+            </div>
+            <div class="tab-item" data-page="split-page">
+                <i class="fas fa-cut tab-icon"></i>
+                <span class="tab-label">分割</span>
+            </div>
+            <div class="tab-item" data-page="settings-page">
+                <i class="fas fa-cog tab-icon"></i>
+                <span class="tab-label">设置</span>
+            </div>
+        </div>
+        
+        <!-- 提示信息 -->
+        <div class="toast" id="toast"></div>
+    </div>
+
+    <script>
+        // 全局变量
+        let images = [];
+        let currentImageIndex = -1;
+        let isDragging = false;
+        let dividerPosition = 0.5;
+        let canvas, ctx;
+        let imageRect = { left: 0, top: 0, width: 0, height: 0 };
+        
+        // DOM元素
+        const fileInput = document.getElementById('fileInput');
+        const selectImagesBtn = document.getElementById('selectImagesBtn');
+        const imageList = document.getElementById('imageList');
+        const emptyImageList = document.getElementById('emptyImageList');
+        const imageCount = document.getElementById('imageCount');
+        const imageContainer = document.getElementById('imageContainer');
+        const emptyOperationArea = document.getElementById('emptyOperationArea');
+        const imageCanvas = document.getElementById('imageCanvas');
+        const dividerLine = document.getElementById('dividerLine');
+        const leftPreview = document.getElementById('leftPreview');
+        const rightPreview = document.getElementById('rightPreview');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const toast = document.getElementById('toast');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            canvas = imageCanvas;
+            ctx = canvas.getContext('2d');
+            
+            // 标签页切换
+            document.querySelectorAll('.tab-item').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const pageId = this.getAttribute('data-page');
+                    
+                    // 移除所有active类
+                    document.querySelectorAll('.tab-item').forEach(t => {
+                        t.classList.remove('active');
+                    });
+                    document.querySelectorAll('.page').forEach(p => {
+                        p.classList.remove('active');
+                    });
+                    
+                    // 添加active类到当前标签
+                    this.classList.add('active');
+                    document.getElementById(pageId).classList.add('active');
+                    
+                    // 如果是分割页面且已选择图像，更新画布显示
+                    if (pageId === 'split-page' && currentImageIndex >= 0) {
+                        setTimeout(() => {
+                            updateCanvasSize();
+                            drawCurrentImage();
+                        }, 50);
+                    }
+                });
+            });
+            
+            // 事件监听
+            selectImagesBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // 操作按钮事件
+            document.getElementById('resetDividerBtn').addEventListener('click', resetDivider);
+            document.getElementById('splitCurrentBtn').addEventListener('click', splitCurrentImage);
+            document.getElementById('applyToAllBtn').addEventListener('click', applyDividerToAll);
+            document.getElementById('splitAllBtn').addEventListener('click', splitAllImages);
+            document.getElementById('clearAllBtn').addEventListener('click', clearAllImages);
+            
+            // 分割线拖动事件 - 修复触摸事件
+            dividerLine.addEventListener('mousedown', startDragging);
+            dividerLine.addEventListener('touchstart', startDragging, { passive: false });
+            
+            // 在画布上点击设置分割线位置
+            canvas.addEventListener('mousedown', setDividerByClick);
+            canvas.addEventListener('touchstart', setDividerByClick, { passive: false });
+            
+            // 停止拖动
+            document.addEventListener('mouseup', stopDragging);
+            document.addEventListener('touchend', stopDragging);
+            document.addEventListener('mousemove', dragDivider);
+            document.addEventListener('touchmove', dragDivider, { passive: false });
+            
+            // 窗口大小变化时调整画布
+            window.addEventListener('resize', updateCanvasSize);
+            
+            // 初始更新
+            updateImageCount();
+        });
+        
+        // 显示提示信息
+        function showToast(message, duration = 3000) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+        
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (!files.length) return;
+            
+            let loadedCount = 0;
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!file.type.match('image.*')) continue;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        images.push({
+                            id: Date.now() + i,
+                            name: file.name,
+                            file: file,
+                            url: e.target.result,
+                            width: img.width,
+                            height: img.height,
+                            dividerPosition: 0.5,
+                            // 模拟文件路径（实际浏览器无法获取真实路径）
+                            path: file.webkitRelativePath || file.name
+                        });
+                        
+                        loadedCount++;
+                        
+                        if (loadedCount === files.length) {
+                            updateImageList();
+                            updateImageCount();
+                            
+                            // 如果是第一张图片，自动选中
+                            if (images.length === 1) {
+                                selectImage(0);
+                                // 切换到分割标签页
+                                document.querySelector('[data-page="split-page"]').click();
+                            }
+                            
+                            showToast(`已添加 ${files.length} 张图像`);
+                        }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+            
+            fileInput.value = '';
+        }
+        
+        // 更新图像列表
+        function updateImageList() {
+            if (images.length === 0) {
+                emptyImageList.style.display = 'block';
+                return;
+            }
+            
+            emptyImageList.style.display = 'none';
+            
+            // 清空列表
+            imageList.innerHTML = '';
+            
+            // 添加图像项
+            images.forEach((image, index) => {
+                const imageItem = document.createElement('div');
+                imageItem.className = `image-item ${index === currentImageIndex ? 'active' : ''}`;
+                imageItem.dataset.index = index;
+                
+                imageItem.innerHTML = `
+                    <img src="${image.url}" alt="${image.name}" class="image-thumb">
+                    <div class="image-name">${image.name}</div>
+                `;
+                
+                imageItem.addEventListener('click', () => {
+                    selectImage(index);
+                    // 切换到分割标签页
+                    document.querySelector('[data-page="split-page"]').click();
+                });
+                imageList.appendChild(imageItem);
+            });
+        }
+        
+        // 更新图像计数
+        function updateImageCount() {
+            imageCount.textContent = `${images.length} 张`;
+        }
+        
+        // 选择图像
+        function selectImage(index) {
+            if (index < 0 || index >= images.length) return;
+            
+            currentImageIndex = index;
+            updateImageList();
+            
+            // 更新画布显示
+            updateCanvasSize();
+            drawCurrentImage();
+            
+            // 恢复该图像的分割线位置
+            dividerPosition = images[index].dividerPosition;
+            updateDividerPosition();
+            
+            // 隐藏空状态
+            emptyOperationArea.style.display = 'none';
+            dividerLine.style.display = 'block';
+            
+            // 更新预览
+            updatePreview();
+        }
+        
+        // 更新画布尺寸
+        function updateCanvasSize() {
+            if (currentImageIndex < 0) return;
+            
+            const container = document.getElementById('imageContainer');
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            
+            const image = images[currentImageIndex];
+            const aspectRatio = image.width / image.height;
+            
+            let canvasWidth, canvasHeight;
+            
+            if (containerWidth / containerHeight > aspectRatio) {
+                // 高度为限制因素
+                canvasHeight = containerHeight;
+                canvasWidth = canvasHeight * aspectRatio;
+            } else {
+                // 宽度为限制因素
+                canvasWidth = containerWidth;
+                canvasHeight = canvasWidth / aspectRatio;
+            }
+            
+            // 设置画布尺寸
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            
+            // 计算图像在容器中的位置
+            imageRect.width = canvasWidth;
+            imageRect.height = canvasHeight;
+            imageRect.left = (containerWidth - canvasWidth) / 2;
+            imageRect.top = (containerHeight - canvasHeight) / 2;
+            
+            // 重新绘制图像
+            drawCurrentImage();
+            updateDividerPosition();
+        }
+        
+        // 绘制当前图像
+        function drawCurrentImage() {
+            if (currentImageIndex < 0) return;
+            
+            const image = images[currentImageIndex];
+            const img = new Image();
+            img.onload = function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // 保存显示尺寸
+                image.displayWidth = canvas.width;
+                image.displayHeight = canvas.height;
+                
+                // 更新预览
+                updatePreview();
+            };
+            img.src = image.url;
+        }
+        
+        // 更新分割线位置 - 修复位置计算
+        function updateDividerPosition() {
+            if (!canvas.width || currentImageIndex < 0) return;
+            
+            const image = images[currentImageIndex];
+            
+            // 计算分割线在画布中的X坐标
+            const x = canvas.width * dividerPosition;
+            
+            // 更新分割线位置
+            dividerLine.style.left = `${imageRect.left + x}px`;
+            dividerLine.style.top = `${imageRect.top}px`;
+            dividerLine.style.height = `${imageRect.height}px`;
+            
+            // 更新当前图像的分割线位置
+            image.dividerPosition = dividerPosition;
+            
+            // 更新预览
+            updatePreview();
+        }
+        
+        // 开始拖动分割线
+        function startDragging(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            isDragging = true;
+            dividerLine.style.transition = 'none';
+        }
+        
+        // 拖动分割线 - 修复位置计算
+        function dragDivider(e) {
+            if (!isDragging) return;
+            
+            e.preventDefault();
+            
+            let clientX;
+            if (e.type === 'touchmove') {
+                clientX = e.touches[0].clientX;
+            } else {
+                clientX = e.clientX;
+            }
+            
+            // 计算相对于画布的位置
+            let x = clientX - imageRect.left;
+            
+            // 限制在画布范围内
+            x = Math.max(0, Math.min(x, canvas.width));
+            
+            // 计算分割线位置比例
+            dividerPosition = x / canvas.width;
+            updateDividerPosition();
+        }
+        
+        // 通过点击设置分割线位置 - 修复位置计算
+        function setDividerByClick(e) {
+            if (isDragging) return;
+            
+            e.preventDefault();
+            
+            let clientX;
+            if (e.type === 'touchstart') {
+                clientX = e.touches[0].clientX;
+            } else {
+                clientX = e.clientX;
+            }
+            
+            // 计算相对于画布的位置
+            let x = clientX - imageRect.left;
+            
+            // 限制在画布范围内
+            x = Math.max(0, Math.min(x, canvas.width));
+            
+            // 计算分割线位置比例
+            dividerPosition = x / canvas.width;
+            updateDividerPosition();
+        }
+        
+        // 停止拖动
+        function stopDragging() {
+            if (!isDragging) return;
+            isDragging = false;
+            dividerLine.style.transition = 'left 0.1s';
+        }
+        
+        // 重置分割线
+        function resetDivider() {
+            if (currentImageIndex < 0) {
+                showToast('请先选择一张图像');
+                return;
+            }
+            
+            dividerPosition = 0.5;
+            updateDividerPosition();
+            showToast('分割线已重置到中间位置');
+        }
+        
+        // 应用当前分割线位置到所有图像
+        function applyDividerToAll() {
+            if (currentImageIndex < 0) {
+                showToast('请先选择一张图像');
+                return;
+            }
+            
+            const currentPosition = dividerPosition;
+            let count = 0;
+            
+            images.forEach((image, index) => {
+                // 跳过当前图像，因为它已经应用了
+                if (index !== currentImageIndex) {
+                    image.dividerPosition = currentPosition;
+                    count++;
+                }
+            });
+            
+            showToast(`分割线位置已应用到其他 ${count} 张图像`);
+        }
+        
+        // 更新预览
+        function updatePreview() {
+            if (currentImageIndex < 0 || !canvas.width) return;
+            
+            const x = canvas.width * dividerPosition;
+            
+            // 创建左侧预览
+            const leftCanvas = document.createElement('canvas');
+            leftCanvas.width = x;
+            leftCanvas.height = canvas.height;
+            const leftCtx = leftCanvas.getContext('2d');
+            leftCtx.drawImage(canvas, 0, 0, x, canvas.height, 0, 0, x, canvas.height);
+            
+            leftPreview.src = leftCanvas.toDataURL();
+            
+            // 创建右侧预览
+            const rightCanvas = document.createElement('canvas');
+            rightCanvas.width = canvas.width - x;
+            rightCanvas.height = canvas.height;
+            const rightCtx = rightCanvas.getContext('2d');
+            rightCtx.drawImage(canvas, x, 0, canvas.width - x, canvas.height, 0, 0, canvas.width - x, canvas.height);
+            
+            rightPreview.src = rightCanvas.toDataURL();
+        }
+        
+        // 生成保存文件名
+        function generateSaveFileName(image, index, side, format) {
+            const baseName = image.name.substring(0, image.name.lastIndexOf('.'));
+            const extension = image.name.substring(image.name.lastIndexOf('.'));
+            const sideSuffix = side === 'left' ? '_L' : '_R';
+            
+            if (format === 'numbered') {
+                return `image_${index + 1}${sideSuffix}${extension}`;
+            } else {
+                return `${baseName}${sideSuffix}${extension}`;
+            }
+        }
+        
+        // 分割当前图像
+        function splitCurrentImage() {
+            if (currentImageIndex < 0) {
+                showToast('请先选择一张图像');
+                return;
+            }
+            
+            const image = images[currentImageIndex];
+            const x = canvas.width * dividerPosition;
+            
+            // 创建左侧图像
+            const leftCanvas = document.createElement('canvas');
+            leftCanvas.width = x;
+            leftCanvas.height = canvas.height;
+            const leftCtx = leftCanvas.getContext('2d');
+            leftCtx.drawImage(canvas, 0, 0, x, canvas.height, 0, 0, x, canvas.height);
+            
+            // 创建右侧图像
+            const rightCanvas = document.createElement('canvas');
+            rightCanvas.width = canvas.width - x;
+            rightCanvas.height = canvas.height;
+            const rightCtx = rightCanvas.getContext('2d');
+            rightCtx.drawImage(canvas, x, 0, canvas.width - x, canvas.height, 0, 0, canvas.width - x, canvas.height);
+            
+            // 生成文件名
+            const format = document.querySelector('input[name="format"]:checked').value;
+            const leftName = generateSaveFileName(image, currentImageIndex, 'left', format);
+            const rightName = generateSaveFileName(image, currentImageIndex, 'right', format);
+            
+            // 触发下载（模拟保存到原路径）
+            downloadImage(leftCanvas.toDataURL(), leftName);
+            downloadImage(rightCanvas.toDataURL(), rightName);
+            
+            showToast(`已保存: ${leftName}, ${rightName}`);
+        }
+        
+        // 分割所有图像
+        function splitAllImages() {
+            if (images.length === 0) {
+                showToast('请先选择图像');
+                return;
+            }
+            
+            const format = document.querySelector('input[name="format"]:checked').value;
+            
+            // 显示进度条
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressText.textContent = '准备中...';
+            
+            let processed = 0;
+            let total = images.length;
+            
+            // 处理每张图像
+            images.forEach((image, index) => {
+                setTimeout(() => {
+                    const img = new Image();
+                    img.onload = function() {
+                        // 计算分割位置
+                        const dividerPos = image.dividerPosition;
+                        const splitX = img.width * dividerPos;
+                        
+                        // 创建左侧图像
+                        const leftCanvas = document.createElement('canvas');
+                        leftCanvas.width = splitX;
+                        leftCanvas.height = img.height;
+                        const leftCtx = leftCanvas.getContext('2d');
+                        leftCtx.drawImage(img, 0, 0, splitX, img.height, 0, 0, splitX, img.height);
+                        
+                        // 创建右侧图像
+                        const rightCanvas = document.createElement('canvas');
+                        rightCanvas.width = img.width - splitX;
+                        rightCanvas.height = img.height;
+                        const rightCtx = rightCanvas.getContext('2d');
+                        rightCtx.drawImage(img, splitX, 0, img.width - splitX, img.height, 0, 0, img.width - splitX, img.height);
+                        
+                        // 生成文件名
+                        const leftName = generateSaveFileName(image, index, 'left', format);
+                        const rightName = generateSaveFileName(image, index, 'right', format);
+                        
+                        // 触发下载（模拟保存到原路径）
+                        downloadImage(leftCanvas.toDataURL(), leftName);
+                        setTimeout(() => {
+                            downloadImage(rightCanvas.toDataURL(), rightName);
+                        }, 100);
+                        
+                        // 更新进度
+                        processed++;
+                        const progress = Math.round((processed / total) * 100);
+                        progressFill.style.width = `${progress}%`;
+                        progressText.textContent = `处理中: ${processed}/${total}`;
+                        
+                        // 完成处理
+                        if (processed === total) {
+                            setTimeout(() => {
+                                progressText.textContent = '处理完成!';
+                                showToast(`已成功保存所有 ${total} 张图像的分割结果`);
+                                
+                                // 3秒后重置进度条
+                                setTimeout(() => {
+                                    progressContainer.style.display = 'none';
+                                    progressFill.style.width = '0%';
+                                }, 3000);
+                            }, 500);
+                        }
+                    };
+                    img.src = image.url;
+                }, index * 500); // 延迟处理，避免同时处理太多图像
+            });
+        }
+        
+        // 下载图像（模拟保存到原路径）
+        function downloadImage(dataUrl, filename) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // 清除所有图像
+        function clearAllImages() {
+            if (images.length === 0) {
+                showToast('当前没有图像');
+                return;
+            }
+            
+            if (confirm(`确定要清除所有 ${images.length} 张图像吗？`)) {
+                images = [];
+                currentImageIndex = -1;
+                updateImageList();
+                updateImageCount();
+                
+                // 清空操作区
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                emptyOperationArea.style.display = 'block';
+                dividerLine.style.display = 'none';
+                
+                // 清空预览
+                leftPreview.src = '';
+                rightPreview.src = '';
+                
+                showToast('已清除所有图像');
+            }
+        }
+    </script>
+</body>
 </html>
